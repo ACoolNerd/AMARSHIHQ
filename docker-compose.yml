@@ -1,0 +1,49 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Vijay's DO Droplet — two isolated apps managed by Claude Code
+#
+# Usage:
+#   docker compose up -d          # start both apps
+#   docker compose logs -f        # tail logs
+#   docker compose restart anelia # restart one app
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  anelia:
+    build:
+      context: ./apps/anelia
+      dockerfile: Dockerfile
+    container_name: anelia
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"   # bind to loopback only — Cloudflare Tunnel handles external traffic
+    env_file:
+      - ./apps/anelia/.env
+    volumes:
+      - anelia_data:/app/data
+    networks:
+      - internal
+
+  school:
+    build:
+      context: ./apps/school
+      dockerfile: Dockerfile
+    container_name: school
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3002"   # bind to loopback only
+    env_file:
+      - ./apps/school/.env
+    volumes:
+      - school_data:/app/data
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  anelia_data:
+  school_data:

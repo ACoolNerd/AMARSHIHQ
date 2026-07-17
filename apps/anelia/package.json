@@ -1,0 +1,17 @@
+{
+  "name": "anelia",
+  "version": "1.0.0",
+  "description": "Anelia app — backend API on port 3001",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "build": "echo 'No frontend build step for API — skipping'"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
