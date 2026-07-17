@@ -4,7 +4,39 @@
 
 ---
 
-## Architecture overview
+## Table of contents
+
+1. [What this is](#what-this-is)
+2. [Architecture](#architecture)
+3. [Repo layout](#repo-layout)
+4. [Required secrets](#required-secrets)
+5. [Launch checklist](#launch-checklist)
+6. [Local development](#local-development)
+7. [Deploy workflow](#deploy-workflow)
+8. [Operate](#operate)
+9. [Rollback](#rollback)
+10. [Troubleshoot](#troubleshoot)
+11. [Extend](#extend)
+12. [Alternative deployment options](#alternative-deployment-options)
+13. [Claude Code prompt pack](#claude-code-prompt-pack)
+14. [Cost snapshot](#cost-snapshot)
+
+---
+
+## What this is
+
+AMARSHIHQ is a two-app solo developer infrastructure running on a single DigitalOcean Droplet. It hosts:
+
+- **anelia** — Express API on port 3001 (loopback only, proxied via Cloudflare Tunnel)
+- **school** — Express API on port 3002 (same pattern)
+
+Frontends are built locally and deployed directly to Netlify with `netlify deploy`. There is no push-to-deploy pipeline — Claude Code is the CI/CD layer.
+
+GitHub Actions runs validation only (install + compose check) on every push. No secrets leave GitHub.
+
+---
+
+## Architecture
 
 ```
 Claude Code  (SSH into Droplet)
@@ -41,38 +73,62 @@ Claude Code  (SSH into Droplet)
 
 ```
 AMARSHIHQ/
+├── .github/
+│   └── workflows/
+│       └── ci.yml            Validate apps + Compose syntax (no deploy)
 ├── apps/
-│   ├── anelia/          Express API skeleton (port 3001)
+│   ├── anelia/               Express API (port 3001)
 │   │   ├── index.js
 │   │   ├── package.json
 │   │   ├── Dockerfile
 │   │   └── .env.example
-│   └── school/          Express API skeleton (port 3002)
+│   └── school/               Express API (port 3002)
 │       ├── index.js
 │       ├── package.json
 │       ├── Dockerfile
 │       └── .env.example
 ├── cloudflared/
-│   └── config.yml       Tunnel config (fill in tunnel ID)
+│   └── config.yml            Tunnel config (fill in tunnel ID)
 ├── dashboard/
-│   ├── index.html       Shareable stack overview page
-│   └── netlify.toml     Netlify deploy config for dashboard subdomain
+│   ├── index.html            Shareable stack overview page
+│   └── netlify.toml          Netlify deploy config for dashboard subdomain
 ├── scripts/
-│   └── deploy.sh        Netlify CLI direct deploy (anelia|school|dashboard|all)
-├── docker-compose.yml   Manages both app containers
+│   ├── deploy.sh             Netlify CLI direct deploy (anelia|school|dashboard|all)
+│   ├── health-check.sh       Verify all services are up on the Droplet
+│   └── rollback.sh           Revert a container to its previous image
+├── docker-compose.yml        Manages both app containers
 └── .gitignore
 ```
 
 ---
 
-## Quick-start (Droplet bootstrap)
+## Required secrets
 
-### 1. Provision the Droplet
+These live in `.env` files on the Droplet — never commit them.
+
+| Variable | Used by | Where to get it |
+|---|---|---|
+| `PORT` | anelia (3001), school (3002) | Set in `.env.example` |
+| `AIRTABLE_API_KEY` | both apps | Airtable → Account → API |
+| `AIRTABLE_BASE_ID` | both apps | Airtable → API docs for your base |
+| `R2_ACCOUNT_ID` | both apps | Cloudflare dashboard → R2 |
+| `R2_ACCESS_KEY_ID` | both apps | Cloudflare R2 → Manage API tokens |
+| `R2_SECRET_ACCESS_KEY` | both apps | Same as above |
+| `R2_BUCKET_NAME` | both apps | Your R2 bucket name |
+| `R2_ENDPOINT` | both apps | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` |
+
+Template files: `apps/anelia/.env.example`, `apps/school/.env.example`
+
+---
+
+## Launch checklist
+
+Complete these steps once, in order, to go from zero to production.
+
+### Step 1 — Provision the Droplet
 
 ```bash
-# DigitalOcean Basic — 2 GB / 1 vCPU / $12/mo
-# Choose Ubuntu 24.04 LTS, NYC or SFO region
-# OR use doctl:
+# DigitalOcean Basic — 2 GB / 1 vCPU / Ubuntu 24.04 LTS (~$12/mo)
 doctl compute droplet create vijay-hq \
   --size s-1vcpu-2gb \
   --image ubuntu-24-04-x64 \
@@ -80,91 +136,103 @@ doctl compute droplet create vijay-hq \
   --ssh-keys <your-key-id>
 ```
 
-### 2. SSH in and install dependencies
+### Step 2 — Install dependencies on the Droplet
 
 ```bash
 ssh root@your_droplet_ip
 
 # Docker
 curl -fsSL https://get.docker.com | sh
-# Claude Code
-npm install -g @anthropic-ai/claude-code
-# Netlify CLI
-npm install -g netlify-cli
+
+# Node tooling
+npm install -g @anthropic-ai/claude-code netlify-cli
+
 # Cloudflared
 curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
   -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared
 ```
 
-### 3. Clone this repo onto the Droplet
+### Step 3 — Clone the repo
 
 ```bash
 git clone https://github.com/ACoolNerd/AMARSHIHQ.git /root/hq
 cd /root/hq
 ```
 
-### 4. Configure environment files
+### Step 4 — Configure environment files
 
 ```bash
 cp apps/anelia/.env.example apps/anelia/.env
 cp apps/school/.env.example apps/school/.env
-# Edit both .env files with real Airtable keys, R2 credentials, etc.
-nano apps/anelia/.env
+nano apps/anelia/.env   # fill in Airtable + R2 credentials
 nano apps/school/.env
 ```
 
-### 5. Start the apps
+### Step 5 — Start the containers
 
 ```bash
 docker compose up -d --build
 docker compose ps      # both containers should show "running"
 ```
 
-### 6. Set up Cloudflare Tunnel
+### Step 6 — Set up Cloudflare Tunnel
 
 ```bash
-cloudflared tunnel login                    # opens browser auth
-cloudflared tunnel create vijay-droplet     # note the tunnel ID printed
-# Edit cloudflared/config.yml — replace <YOUR_TUNNEL_ID>
-nano cloudflared/config.yml
+cloudflared tunnel login                        # browser auth
+cloudflared tunnel create vijay-droplet         # note the tunnel ID
+nano cloudflared/config.yml                     # replace <YOUR_TUNNEL_ID>
 cloudflared tunnel route dns vijay-droplet api-anelia.yourdomain.com
 cloudflared tunnel route dns vijay-droplet api-school.yourdomain.com
 cloudflared service install
 systemctl start cloudflared
 ```
 
-### 7. Deploy frontends to Netlify
+### Step 7 — Configure Cloudflare DNS (manual, ~5 min)
+
+In the Cloudflare dashboard for `yourdomain.com`:
+
+| Type | Name | Target | Proxy |
+|---|---|---|---|
+| CNAME | `anelia` | `your-netlify-site.netlify.app` | ✅ Proxied |
+| CNAME | `school` | `your-school-netlify-site.netlify.app` | ✅ Proxied |
+| CNAME | `api-anelia` | `<tunnel-id>.cfargotunnel.com` | ✅ Proxied |
+| CNAME | `api-school` | `<tunnel-id>.cfargotunnel.com` | ✅ Proxied |
+| CNAME | `dashboard` | `your-dashboard.netlify.app` | ✅ Proxied |
+
+### Step 8 — Deploy frontends to Netlify
 
 ```bash
-netlify login                               # or set NETLIFY_AUTH_TOKEN
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh all                     # deploys anelia, school, and dashboard
+netlify login                   # or export NETLIFY_AUTH_TOKEN=...
+chmod +x scripts/deploy.sh scripts/health-check.sh scripts/rollback.sh
+./scripts/deploy.sh all         # deploys anelia, school, and dashboard
 ```
+
+### Step 9 — Verify launch readiness
+
+```bash
+./scripts/health-check.sh       # all checks should pass
+curl https://api-anelia.yourdomain.com/health
+curl https://api-school.yourdomain.com/health
+```
+
+**Launch gates — all must be ✅ before going live:**
+
+- [ ] Both containers running (`docker compose ps`)
+- [ ] `localhost:3001/health` → `{"status":"ok","app":"anelia",...}`
+- [ ] `localhost:3002/health` → `{"status":"ok","app":"school",...}`
+- [ ] `cloudflared` service active (`systemctl is-active cloudflared`)
+- [ ] `api-anelia.yourdomain.com/health` → 200
+- [ ] `api-school.yourdomain.com/health` → 200
+- [ ] `anelia.yourdomain.com` loads frontend
+- [ ] `school.yourdomain.com` loads frontend
+- [ ] `dashboard.yourdomain.com` loads dashboard
+- [ ] `.env` files present and not committed to git
 
 ---
 
-## Dashboard (shared reference page)
+## Local development
 
-A pre-built, shareable status and architecture page lives at `dashboard/index.html`. Deploy it to its own Netlify site and point `dashboard.yourdomain.com` at it — share the URL with anyone who needs to understand the stack.
-
-```bash
-# Deploy just the dashboard
-./scripts/deploy.sh dashboard
-
-# Or set a specific Netlify site ID for the dashboard
-export NETLIFY_SITE_ID_DASHBOARD=your-dashboard-site-id
-./scripts/deploy.sh dashboard
-```
-
-The dashboard covers: what every service is, where every URL lives, what can be built next, and a side-by-side comparison of alternative deployment options.
-
----
-
-## Alternative development environments
-
-### Option A — Local dev (no Docker, fastest iteration)
-
-Run both apps directly on your machine before spinning up the Droplet:
+Run both apps directly on your machine — no Docker required.
 
 ```bash
 # Terminal 1
@@ -173,59 +241,209 @@ cd apps/anelia && cp .env.example .env && npm install && npm run dev
 # Terminal 2
 cd apps/school && cp .env.example .env && npm install && npm run dev
 
-# Test both health endpoints
+# Verify both are up
 curl http://localhost:3001/health
 curl http://localhost:3002/health
 ```
 
-### Option B — pm2 (lightweight process manager, no Docker)
-
-Good if Docker feels heavy on a 2 GB box:
+Alternatively, use **pm2** (lightweight, no Docker):
 
 ```bash
 npm install -g pm2
 pm2 start apps/anelia/index.js --name anelia
-pm2 start apps/school/index.js  --name school
+pm2 start apps/school/index.js --name school
 pm2 save && pm2 startup          # survive reboots
 pm2 logs anelia                  # tail logs
 pm2 restart school               # rolling restart
 ```
 
-### Option C — Docker Compose (current default, recommended for the Droplet)
+---
 
-Fully isolated containers, automatic restart on crash, easy to update individually:
+## Deploy workflow
+
+All deploys run from the Droplet via SSH. There is no push-to-deploy.
+
+### Update an API (backend change)
 
 ```bash
-docker compose up -d --build          # start / rebuild both
-docker compose restart anelia         # restart one container
-docker compose logs -f school         # stream logs
-docker compose exec anelia sh         # shell into container
+# 1. Edit the source file
+nano /root/hq/apps/anelia/index.js
+
+# 2. Save a rollback point
+docker tag anelia:latest anelia:previous
+
+# 3. Rebuild and restart
+docker compose up -d --build anelia
+
+# 4. Verify
+curl http://localhost:3001/health
+```
+
+### Update a frontend
+
+```bash
+# Build the frontend (in the app's front-end dir)
+npm run build
+
+# Deploy to Netlify
+./scripts/deploy.sh anelia
+```
+
+### Deploy all
+
+```bash
+./scripts/deploy.sh all
+```
+
+### Deploy only the dashboard
+
+```bash
+./scripts/deploy.sh dashboard
+# Or with an explicit Netlify site ID:
+export NETLIFY_SITE_ID_DASHBOARD=your-site-id
+./scripts/deploy.sh dashboard
 ```
 
 ---
 
-## Alternative deployment options
+## Operate
 
-The table below compares the current stack to common alternatives so you can make an informed switch if your needs grow.
+### Daily commands
 
-| Option | Dev workflow | Deploy | Approx. cost | Best for |
-|---|---|---|---|---|
-| **Current ✅** DO + Netlify + CF Tunnel | SSH → Claude Code | `./scripts/deploy.sh` | ~$12/mo | Solo, no CI overhead |
-| GitHub Actions CI/CD | Push to main | Auto on merge | ~$12/mo (same DO) | Teams, audit trails, rollbacks |
-| Railway.app | Connect GitHub repo | Git push | ~$5–15/mo | Fastest start, zero server management |
-| Render.com | Connect GitHub + Docker | Git push | Free → $7/mo per svc | Simple APIs (sleeps on free tier) |
-| Fly.io | `fly deploy` from CLI | CLI push | ~$3–6/mo per app | Global edge, more control than Railway |
-| Hetzner VPS | Same as current | `./scripts/deploy.sh` | ~€4–5/mo | Lowest raw price, EU latency |
+```bash
+docker compose ps                        # container status
+docker compose logs -f anelia            # stream anelia logs
+docker compose logs -f school            # stream school logs
+./scripts/health-check.sh               # full stack health check
+```
 
-> **Why DigitalOcean over Hetzner for this setup?** DO's `doctl` CLI integrates cleanly with Claude Code for provisioning and snapshots. Hetzner's abuse-detection is slower to recover from when you're solo and need the box back fast. The ~$8/mo premium is worth it at this scale.
+### Restart a single container
+
+```bash
+docker compose restart anelia
+docker compose restart school
+```
+
+### Rebuild a single container (after code change)
+
+```bash
+docker compose up -d --build anelia
+docker compose up -d --build school
+```
+
+### Shell into a container
+
+```bash
+docker compose exec anelia sh
+docker compose exec school sh
+```
+
+### Rotate credentials
+
+```bash
+nano apps/anelia/.env   # update keys
+nano apps/school/.env
+docker compose restart  # pick up new env vars
+```
+
+### Monitor Cloudflare Tunnel
+
+```bash
+systemctl status cloudflared
+journalctl -u cloudflared -f    # live tunnel logs
+```
 
 ---
 
-## Claude Code prompt pack
+## Rollback
 
-Paste these prompts directly into Claude Code once SSH'd into the Droplet.
+Before any deploy, save a rollback point:
 
-### Bootstrap the full stack
+```bash
+docker tag anelia:latest anelia:previous
+docker tag school:latest school:previous
+```
+
+To revert:
+
+```bash
+./scripts/rollback.sh anelia
+./scripts/rollback.sh school
+```
+
+The rollback script:
+1. Tags the current (broken) image as `<app>:broken` for inspection.
+2. Promotes `<app>:previous` → `<app>:latest`.
+3. Restarts the container.
+4. Verifies `/health` returns 200.
+
+---
+
+## Troubleshoot
+
+### Container won't start
+
+```bash
+docker compose logs --tail=50 anelia     # check error output
+docker compose up anelia                 # run in foreground for full output
+```
+
+### `/health` returns an error
+
+```bash
+# Check the container is actually running
+docker compose ps
+
+# Check the port binding
+docker compose port anelia 3001
+
+# Hit it directly
+curl -v http://localhost:3001/health
+```
+
+### Cloudflare Tunnel is down
+
+```bash
+systemctl status cloudflared
+journalctl -u cloudflared --since "10 min ago"
+systemctl restart cloudflared
+```
+
+### Environment variable missing
+
+```bash
+docker compose exec anelia printenv | grep AIRTABLE
+# If blank, edit apps/anelia/.env and restart:
+docker compose restart anelia
+```
+
+### Airtable record cap warning
+
+Airtable free tier = **1,000 records/base**. The school `/api/submissions` endpoint writes one record per submission. Check headroom every 6 months:
+
+```
+Query the Airtable base for app "school" (base ID: $AIRTABLE_BASE_ID)
+and count total records across all tables. Print the count and warn me
+if we are above 800 records (free tier cap is 1,000).
+```
+
+---
+
+## Extend
+
+### Add a new API route
+
+Use this Claude Code prompt on the Droplet:
+
+```
+In /root/hq/apps/anelia/index.js, add a POST /api/items route that:
+1. Accepts JSON body { name, description }.
+2. Writes a new record to Airtable base $AIRTABLE_BASE_ID using the REST API.
+3. Returns the created record as JSON with status 201.
+Use fetch (Node 18+). Read credentials from process.env. Restart the container after.
+```
+
+### Bootstrap the full stack from scratch
 
 ```
 I am building a 2-app infrastructure on this DigitalOcean Droplet.
@@ -238,33 +456,6 @@ Please verify docker compose is running, cloudflared is active,
 and both /health endpoints return 200. Fix anything that is broken.
 ```
 
-### Add a new API route (Anelia)
-
-```
-In /root/hq/apps/anelia/index.js, add a POST /api/items route that:
-1. Accepts JSON body { name, description }.
-2. Writes a new record to Airtable base $AIRTABLE_BASE_ID using the REST API.
-3. Returns the created record as JSON with status 201.
-Use fetch (Node 18+). Read credentials from process.env. Restart the container after.
-```
-
-### Deploy after a code change
-
-```
-I just updated /root/hq/apps/anelia/index.js.
-Please: rebuild the Docker container (`docker compose up -d --build anelia`),
-confirm /health returns 200, then run `./scripts/deploy.sh anelia`
-to push the updated frontend to Netlify.
-```
-
-### Check Airtable record headroom
-
-```
-Query the Airtable base for app "school" (base ID: $AIRTABLE_BASE_ID)
-and count total records across all tables. Print the count and warn me
-if we are above 800 records (free tier cap is 1,000).
-```
-
 ### Rotate R2 credentials
 
 ```
@@ -274,19 +465,28 @@ with the new values I paste below. Then restart both containers
 and confirm /health is still 200 for each.
 ```
 
+### Add a third app
+
+1. Copy `apps/anelia/` → `apps/newapp/`, update `PORT` to 3003.
+2. Add a `newapp` service in `docker-compose.yml` bound to `127.0.0.1:3003:3003`.
+3. Add a new ingress rule in `cloudflared/config.yml`.
+4. Add DNS entries in Cloudflare.
+5. Add a `deploy_app "newapp"` case in `scripts/deploy.sh`.
+
 ---
 
-## One-time Cloudflare DNS setup (manual, ~5 min)
+## Alternative deployment options
 
-In the Cloudflare dashboard for `yourdomain.com`:
+| Option | Dev workflow | Deploy | Approx. cost | Best for |
+|---|---|---|---|---|
+| **Current ✅** DO + Netlify + CF Tunnel | SSH → Claude Code | `./scripts/deploy.sh` | ~$12/mo | Solo, no CI overhead |
+| GitHub Actions CI/CD | Push to main | Auto on merge | ~$12/mo (same DO) | Teams, audit trails |
+| Railway.app | Connect GitHub repo | Git push | ~$5–15/mo | Fastest start, zero server management |
+| Render.com | Connect GitHub + Docker | Git push | Free → $7/mo per svc | Simple APIs (sleeps on free tier) |
+| Fly.io | `fly deploy` from CLI | CLI push | ~$3–6/mo per app | Global edge, more control than Railway |
+| Hetzner VPS | Same as current | `./scripts/deploy.sh` | ~€4–5/mo | Lowest raw price, EU latency |
 
-| Type | Name | Target | Proxy |
-|---|---|---|---|
-| CNAME | `anelia` | `your-netlify-site.netlify.app` | ✅ Proxied |
-| CNAME | `school` | `your-school-netlify-site.netlify.app` | ✅ Proxied |
-| CNAME | `api-anelia` | `<tunnel-id>.cfargotunnel.com` | ✅ Proxied |
-| CNAME | `api-school` | `<tunnel-id>.cfargotunnel.com` | ✅ Proxied |
-| CNAME | `dashboard` | `your-dashboard.netlify.app` | ✅ Proxied |
+> **Why DigitalOcean over Hetzner?** DO's `doctl` CLI integrates cleanly with Claude Code for provisioning and snapshots. Hetzner's abuse-detection is slower to recover from when you're solo. The ~$8/mo premium is worth it at this scale.
 
 ---
 
@@ -300,12 +500,6 @@ In the Cloudflare dashboard for `yourdomain.com`:
 | Netlify | Starter | $0 |
 | Airtable | Free (until 2028) | $0 |
 | **Total** | | **~$12/mo** |
-
----
-
-## ⚠️ Airtable record cap reminder
-
-Airtable free tier = **1,000 records/base**. The school app's `/api/submissions` endpoint writes one record per submission. Run the "Check Airtable record headroom" Claude Code prompt every 6 months.
 
 ---
 
