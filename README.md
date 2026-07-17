@@ -33,6 +33,7 @@ Claude Code  (SSH into Droplet)
 | `api-anelia.yourdomain.com` | Cloudflare Tunnel → Droplet :3001 |
 | `school.yourdomain.com` | CNAME → Netlify (frontend) |
 | `api-school.yourdomain.com` | Cloudflare Tunnel → Droplet :3002 |
+| `dashboard.yourdomain.com` | CNAME → Netlify (shared dashboard) |
 
 ---
 
@@ -53,8 +54,11 @@ AMARSHIHQ/
 │       └── .env.example
 ├── cloudflared/
 │   └── config.yml       Tunnel config (fill in tunnel ID)
+├── dashboard/
+│   ├── index.html       Shareable stack overview page
+│   └── netlify.toml     Netlify deploy config for dashboard subdomain
 ├── scripts/
-│   └── deploy.sh        Netlify CLI direct deploy
+│   └── deploy.sh        Netlify CLI direct deploy (anelia|school|dashboard|all)
 ├── docker-compose.yml   Manages both app containers
 └── .gitignore
 ```
@@ -134,8 +138,86 @@ systemctl start cloudflared
 ```bash
 netlify login                               # or set NETLIFY_AUTH_TOKEN
 chmod +x scripts/deploy.sh
-./scripts/deploy.sh all
+./scripts/deploy.sh all                     # deploys anelia, school, and dashboard
 ```
+
+---
+
+## Dashboard (shared reference page)
+
+A pre-built, shareable status and architecture page lives at `dashboard/index.html`. Deploy it to its own Netlify site and point `dashboard.yourdomain.com` at it — share the URL with anyone who needs to understand the stack.
+
+```bash
+# Deploy just the dashboard
+./scripts/deploy.sh dashboard
+
+# Or set a specific Netlify site ID for the dashboard
+export NETLIFY_SITE_ID_DASHBOARD=your-dashboard-site-id
+./scripts/deploy.sh dashboard
+```
+
+The dashboard covers: what every service is, where every URL lives, what can be built next, and a side-by-side comparison of alternative deployment options.
+
+---
+
+## Alternative development environments
+
+### Option A — Local dev (no Docker, fastest iteration)
+
+Run both apps directly on your machine before spinning up the Droplet:
+
+```bash
+# Terminal 1
+cd apps/anelia && cp .env.example .env && npm install && npm run dev
+
+# Terminal 2
+cd apps/school && cp .env.example .env && npm install && npm run dev
+
+# Test both health endpoints
+curl http://localhost:3001/health
+curl http://localhost:3002/health
+```
+
+### Option B — pm2 (lightweight process manager, no Docker)
+
+Good if Docker feels heavy on a 2 GB box:
+
+```bash
+npm install -g pm2
+pm2 start apps/anelia/index.js --name anelia
+pm2 start apps/school/index.js  --name school
+pm2 save && pm2 startup          # survive reboots
+pm2 logs anelia                  # tail logs
+pm2 restart school               # rolling restart
+```
+
+### Option C — Docker Compose (current default, recommended for the Droplet)
+
+Fully isolated containers, automatic restart on crash, easy to update individually:
+
+```bash
+docker compose up -d --build          # start / rebuild both
+docker compose restart anelia         # restart one container
+docker compose logs -f school         # stream logs
+docker compose exec anelia sh         # shell into container
+```
+
+---
+
+## Alternative deployment options
+
+The table below compares the current stack to common alternatives so you can make an informed switch if your needs grow.
+
+| Option | Dev workflow | Deploy | Approx. cost | Best for |
+|---|---|---|---|---|
+| **Current ✅** DO + Netlify + CF Tunnel | SSH → Claude Code | `./scripts/deploy.sh` | ~$12/mo | Solo, no CI overhead |
+| GitHub Actions CI/CD | Push to main | Auto on merge | ~$12/mo (same DO) | Teams, audit trails, rollbacks |
+| Railway.app | Connect GitHub repo | Git push | ~$5–15/mo | Fastest start, zero server management |
+| Render.com | Connect GitHub + Docker | Git push | Free → $7/mo per svc | Simple APIs (sleeps on free tier) |
+| Fly.io | `fly deploy` from CLI | CLI push | ~$3–6/mo per app | Global edge, more control than Railway |
+| Hetzner VPS | Same as current | `./scripts/deploy.sh` | ~€4–5/mo | Lowest raw price, EU latency |
+
+> **Why DigitalOcean over Hetzner for this setup?** DO's `doctl` CLI integrates cleanly with Claude Code for provisioning and snapshots. Hetzner's abuse-detection is slower to recover from when you're solo and need the box back fast. The ~$8/mo premium is worth it at this scale.
 
 ---
 
@@ -204,6 +286,7 @@ In the Cloudflare dashboard for `yourdomain.com`:
 | CNAME | `school` | `your-school-netlify-site.netlify.app` | ✅ Proxied |
 | CNAME | `api-anelia` | `<tunnel-id>.cfargotunnel.com` | ✅ Proxied |
 | CNAME | `api-school` | `<tunnel-id>.cfargotunnel.com` | ✅ Proxied |
+| CNAME | `dashboard` | `your-dashboard.netlify.app` | ✅ Proxied |
 
 ---
 
