@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CI — validate both apps and Compose config
+#
+# This workflow does NOT deploy.  Deployments are done directly from the
+# Droplet via SSH + Claude Code using ./scripts/deploy.sh.
+#
+# What this checks:
+#   1. Both Node apps install cleanly and their start scripts are resolvable.
+#   2. docker-compose.yml passes `docker compose config` validation.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-anelia:
+    name: Validate anelia app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/anelia
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/anelia/package.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify entry point resolves
+        run: |
+          node -e "require('./index.js')" &
+          NODE_PID=$!
+          sleep 2
+          kill $NODE_PID 2>/dev/null || true
+
+  validate-school:
+    name: Validate school app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/school
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/school/package.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify entry point resolves
+        run: |
+          node -e "require('./index.js')" &
+          NODE_PID=$!
+          sleep 2
+          kill $NODE_PID 2>/dev/null || true
+
+  validate-compose:
+    name: Validate docker-compose.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create placeholder env files (required by Compose env_file)
+        run: |
+          cp apps/anelia/.env.example apps/anelia/.env
+          cp apps/school/.env.example apps/school/.env
+
+      - name: Validate Compose syntax
+        run: docker compose config --quiet

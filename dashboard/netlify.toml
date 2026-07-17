@@ -1,0 +1,13 @@
+# Netlify config for the dashboard subdomain site
+# Deploy with: ./scripts/deploy.sh dashboard
+# (or: netlify deploy --prod --dir=dashboard --site=<dashboard-site-id>)
+
+[build]
+  publish = "."        # serve the whole dashboard/ folder as-is
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

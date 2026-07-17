@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AMARSHIHQ — Vijay's Stack Dashboard</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --accent:   #58a6ff;
+      --accent2:  #3fb950;
+      --accent3:  #f78166;
+      --accent4:  #d2a8ff;
+      --accent5:  #ffa657;
+      --muted:    #8b949e;
+      --text:     #e6edf3;
+      --radius:   10px;
+    }
+    html { font-size: 16px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────────────── */
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 4rem; }
+
+    /* ── Header ───────────────────────────────────────────────────────────── */
+    header {
+      padding: 2.5rem 0 1.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2.5rem;
+    }
+    .header-inner { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .logo {
+      background: linear-gradient(135deg, var(--accent), var(--accent4));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .tagline {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border: 1px solid;
+    }
+    .badge-green  { color: var(--accent2); border-color: var(--accent2); background: rgba(63,185,80,.08); }
+    .badge-blue   { color: var(--accent);  border-color: var(--accent);  background: rgba(88,166,255,.08); }
+    .badge-orange { color: var(--accent5); border-color: var(--accent5); background: rgba(255,166,87,.08); }
+    .badge-purple { color: var(--accent4); border-color: var(--accent4); background: rgba(210,168,255,.08); }
+
+    /* ── Section headers ──────────────────────────────────────────────────── */
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .section-title .icon { font-size: 1.2rem; }
+
+    /* ── Grid helpers ─────────────────────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+
+    /* ── Card ─────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+    }
+    .card-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .card p { color: var(--muted); font-size: 0.88rem; }
+    .card .url {
+      display: inline-block;
+      margin-top: 0.6rem;
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-family: ui-monospace, "Cascadia Mono", "Fira Code", monospace;
+      text-decoration: none;
+      word-break: break-all;
+    }
+    .card .url:hover { text-decoration: underline; }
+    .card .detail {
+      margin-top: 0.75rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      padding-top: 0.6rem;
+    }
+    .card .detail strong { color: var(--text); }
+
+    /* ── App status row ───────────────────────────────────────────────────── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.6rem;
+      font-size: 0.82rem;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-green  { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+    .dot-orange { background: var(--accent5); box-shadow: 0 0 6px var(--accent5); }
+    .dot-muted  { background: var(--muted); }
+
+    /* ── Architecture diagram ─────────────────────────────────────────────── */
+    .arch-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .arch-flow {
+      font-family: ui-monospace, "Cascadia Mono", "Fira Code", monospace;
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.9;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .arch-flow .hl-blue   { color: var(--accent); }
+    .arch-flow .hl-green  { color: var(--accent2); }
+    .arch-flow .hl-orange { color: var(--accent5); }
+    .arch-flow .hl-purple { color: var(--accent4); }
+    .arch-flow .hl-red    { color: var(--accent3); }
+
+    /* ── Table ────────────────────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th {
+      text-align: left;
+      padding: 0.6rem 1rem;
+      background: rgba(255,255,255,.03);
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    td {
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    td code {
+      font-family: ui-monospace, "Cascadia Mono", "Fira Code", monospace;
+      font-size: 0.8rem;
+      background: rgba(255,255,255,.06);
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      color: var(--accent);
+    }
+
+    /* ── Roadmap ──────────────────────────────────────────────────────────── */
+    .roadmap-item {
+      display: flex;
+      gap: 1rem;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+    .roadmap-item:last-child { border-bottom: none; }
+    .roadmap-icon {
+      font-size: 1.3rem;
+      flex-shrink: 0;
+      margin-top: 0.1rem;
+    }
+    .roadmap-text strong { font-size: 0.92rem; }
+    .roadmap-text p { color: var(--muted); font-size: 0.82rem; margin-top: 0.2rem; }
+
+    /* ── Cost pill ────────────────────────────────────────────────────────── */
+    .cost-total {
+      background: linear-gradient(135deg, rgba(88,166,255,.12), rgba(63,185,80,.12));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1rem;
+    }
+    .cost-total .label { color: var(--muted); font-size: 0.9rem; }
+    .cost-total .amount {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent2);
+    }
+
+    /* ── Prompt block ─────────────────────────────────────────────────────── */
+    .prompt-box {
+      background: #010409;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent4);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      font-family: ui-monospace, "Cascadia Mono", "Fira Code", monospace;
+      font-size: 0.8rem;
+      color: #cdd9e5;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 0.75rem;
+    }
+
+    /* ── Section spacer ───────────────────────────────────────────────────── */
+    .section { margin-bottom: 2.5rem; }
+
+    /* ── Footer ───────────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+
+    /* ── Responsive tweaks ────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .arch-flow { font-size: 0.7rem; }
+      .logo { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ── HEADER ─────────────────────────────────────────────────────────── -->
+  <header>
+    <div class="header-inner">
+      <div>
+        <div class="logo">AMARSHIHQ</div>
+        <div class="tagline">Vijay's Dev HQ — Stack Overview &amp; Reference Dashboard</div>
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem;">
+        <span class="badge badge-green">&#9679; ~$12/mo total</span>
+        <span class="badge badge-blue">2 Apps</span>
+        <span class="badge badge-purple">Claude Code powered</span>
+        <span class="badge badge-orange">No CI/CD needed</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── ARCHITECTURE DIAGRAM ───────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🗺️</span> What the stack is — at a glance</div>
+    <div class="arch-block">
+      <div class="arch-flow"><span class="hl-purple">Claude Code</span>  (you SSH in, give it instructions — it does the rest)
+   │
+   ├── <span class="hl-blue">DigitalOcean Droplet</span>  2 GB / 1 vCPU  ~$12/mo  (NYC / SFO)
+   │      │
+   │      ├── <span class="hl-orange">docker-compose</span>
+   │      │      ├── <span class="hl-green">anelia</span>  → Express API  → 127.0.0.1:3001
+   │      │      └── <span class="hl-green">school</span>  → Express API  → 127.0.0.1:3002
+   │      │
+   │      └── <span class="hl-blue">cloudflared</span> daemon  (Cloudflare Tunnel — no open ports)
+   │             ├── api-anelia.yourdomain.com  ──► :3001
+   │             └── api-school.yourdomain.com  ──► :3002
+   │
+   ├── <span class="hl-orange">Netlify</span>  (frontends — free tier)
+   │      ├── anelia.yourdomain.com   ◄── built &amp; pushed by <code>./scripts/deploy.sh anelia</code>
+   │      └── school.yourdomain.com  ◄── built &amp; pushed by <code>./scripts/deploy.sh school</code>
+   │
+   ├── <span class="hl-green">Airtable</span>  REST API  (free until 2028)
+   │      ├── Base: Anelia  ◄── anelia API reads/writes
+   │      └── Base: School  ◄── school API reads/writes (watch 1K record cap!)
+   │
+   └── <span class="hl-blue">Cloudflare R2</span>  S3-compatible object storage  (free 10 GB)
+          └── endpoint: https://&lt;account&gt;.r2.cloudflarestorage.com</div>
+    </div>
+  </div>
+
+  <!-- ── WHERE THINGS LIVE ───────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📍</span> Where things are</div>
+    <div class="grid-2">
+
+      <div class="card">
+        <div class="card-title">🌐 Anelia — frontend</div>
+        <p>Static site hosted on Netlify. Deployed from the Droplet with one command — no GitHub push needed.</p>
+        <a class="url" href="https://anelia.yourdomain.com">anelia.yourdomain.com</a>
+        <div class="detail">
+          <strong>Deploy:</strong> <code>./scripts/deploy.sh anelia</code><br/>
+          <strong>Source:</strong> <code>/root/hq/apps/anelia/dist/</code>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚙️ Anelia — backend API</div>
+        <p>Express server in Docker on the Droplet. Exposed only through Cloudflare Tunnel — no open firewall port.</p>
+        <a class="url" href="https://api-anelia.yourdomain.com/health">api-anelia.yourdomain.com</a>
+        <div class="detail">
+          <strong>Container:</strong> <code>anelia</code> (port 3001, loopback)<br/>
+          <strong>Health:</strong> <code>GET /health</code>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🎓 School — frontend</div>
+        <p>Static site hosted on Netlify. Same deploy workflow as Anelia — just swap the app name.</p>
+        <a class="url" href="https://school.yourdomain.com">school.yourdomain.com</a>
+        <div class="detail">
+          <strong>Deploy:</strong> <code>./scripts/deploy.sh school</code><br/>
+          <strong>Source:</strong> <code>/root/hq/apps/school/dist/</code>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚙️ School — backend API</div>
+        <p>Express server in Docker on the Droplet. Accepts form submissions via <code>POST /api/submissions</code>.</p>
+        <a class="url" href="https://api-school.yourdomain.com/health">api-school.yourdomain.com</a>
+        <div class="detail">
+          <strong>Container:</strong> <code>school</code> (port 3002, loopback)<br/>
+          <strong>Health:</strong> <code>GET /health</code>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🗄️ Airtable (data layer)</div>
+        <p>Separate base per app. Free tier gives 1,000 records/base — plenty for side projects through 2028.</p>
+        <a class="url" href="https://airtable.com">airtable.com</a>
+        <div class="detail">
+          <strong>Key:</strong> <code>AIRTABLE_API_KEY</code> in each <code>.env</code><br/>
+          <strong>⚠️ Cap:</strong> 1,000 records — check every 6 months
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📦 Cloudflare R2 (file storage)</div>
+        <p>S3-compatible object storage. Use your existing S3 client — just change the endpoint URL.</p>
+        <a class="url" href="https://dash.cloudflare.com">dash.cloudflare.com → R2</a>
+        <div class="detail">
+          <strong>Endpoint:</strong> <code>https://&lt;account&gt;.r2.cloudflarestorage.com</code><br/>
+          <strong>Free:</strong> 10 GB storage, 1M Class A ops/mo
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🚇 Cloudflare Tunnel</div>
+        <p>One <code>cloudflared</code> daemon running on the Droplet creates two tunnels. No firewall rules, no exposed ports, free TLS.</p>
+        <a class="url" href="https://dash.cloudflare.com">dash.cloudflare.com → Zero Trust</a>
+        <div class="detail">
+          <strong>Config:</strong> <code>/root/hq/cloudflared/config.yml</code><br/>
+          <strong>Service:</strong> <code>systemctl status cloudflared</code>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 This dashboard</div>
+        <p>Shared reference page — deployed to Netlify as its own site on a dashboard subdomain.</p>
+        <a class="url" href="https://dashboard.yourdomain.com">dashboard.yourdomain.com</a>
+        <div class="detail">
+          <strong>Deploy:</strong> <code>./scripts/deploy.sh dashboard</code><br/>
+          <strong>Source:</strong> <code>/root/hq/dashboard/</code>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── DNS TABLE ──────────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🌍</span> Cloudflare DNS map</div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Name (subdomain)</th>
+            <th>Target</th>
+            <th>Proxy</th>
+            <th>What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>CNAME</td>
+            <td><code>anelia</code></td>
+            <td><code>your-anelia.netlify.app</code></td>
+            <td>✅ On</td>
+            <td>Anelia frontend (Netlify)</td>
+          </tr>
+          <tr>
+            <td>CNAME</td>
+            <td><code>school</code></td>
+            <td><code>your-school.netlify.app</code></td>
+            <td>✅ On</td>
+            <td>School frontend (Netlify)</td>
+          </tr>
+          <tr>
+            <td>CNAME</td>
+            <td><code>api-anelia</code></td>
+            <td><code>&lt;tunnel-id&gt;.cfargotunnel.com</code></td>
+            <td>✅ On</td>
+            <td>Anelia API (Cloudflare Tunnel → Droplet :3001)</td>
+          </tr>
+          <tr>
+            <td>CNAME</td>
+            <td><code>api-school</code></td>
+            <td><code>&lt;tunnel-id&gt;.cfargotunnel.com</code></td>
+            <td>✅ On</td>
+            <td>School API (Cloudflare Tunnel → Droplet :3002)</td>
+          </tr>
+          <tr>
+            <td>CNAME</td>
+            <td><code>dashboard</code></td>
+            <td><code>your-dashboard.netlify.app</code></td>
+            <td>✅ On</td>
+            <td>This dashboard (Netlify)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── WHAT CAN BE / ROADMAP ───────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🚀</span> What can be — next moves</div>
+    <div class="card">
+      <div class="roadmap-item">
+        <div class="roadmap-icon">🔌</div>
+        <div class="roadmap-text">
+          <strong>Wire Airtable CRUD into both APIs</strong>
+          <p>The route stubs are already in <code>index.js</code> — give Claude Code the prompt from the README and it'll add real Airtable reads/writes in one shot.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-icon">🖼️</div>
+        <div class="roadmap-text">
+          <strong>Add R2 file upload to either app</strong>
+          <p>Install <code>@aws-sdk/client-s3</code>, repoint the endpoint to R2 — your existing closet on R2 is already S3-compatible so no migration needed.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-icon">🔔</div>
+        <div class="roadmap-text">
+          <strong>Add a lightweight notification layer</strong>
+          <p>School submissions or Anelia events can fire a webhook to Discord, Slack, or email via free services (Resend, ntfy.sh) — Claude Code can wire this in minutes.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-icon">🔐</div>
+        <div class="roadmap-text">
+          <strong>Add auth (when ready)</strong>
+          <p>Drop in <a style="color:var(--accent)" href="https://www.passportjs.org">Passport.js</a> (session/JWT) or use Cloudflare Access on the tunnel for zero-code auth on any subdomain.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-icon">📈</div>
+        <div class="roadmap-text">
+          <strong>Scale if traffic grows</strong>
+          <p>Resize the Droplet to 4 GB in the DO console — zero downtime, same IP, same tunnel. No re-architecting needed until you're well past hobby scale.</p>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-icon">🔁</div>
+        <div class="roadmap-text">
+          <strong>Optional: add GitHub as a backup mirror</strong>
+          <p>Run <code>git push origin main</code> from the Droplet periodically. Adds code history without adding CI/CD overhead or changing your deploy flow.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ALTERNATIVE STACKS ─────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🔀</span> Alternative paths — dev &amp; deploy options</div>
+
+    <div style="margin-bottom:1rem;">
+      <p style="color:var(--muted);font-size:.88rem;">The current setup is the lowest-friction choice for solo side-project development. Here's how other common setups compare so you know what you'd be trading.</p>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:1rem;">
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Dev workflow</th>
+            <th>Deploy</th>
+            <th>Cost</th>
+            <th>Best for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong style="color:var(--accent2)">Current ✅</strong><br/><span style="color:var(--muted);font-size:.8rem;">DO + Netlify + Cloudflare Tunnel</span></td>
+            <td>SSH → Claude Code on Droplet</td>
+            <td><code>./scripts/deploy.sh</code></td>
+            <td>~$12/mo</td>
+            <td>Solo, low-token, no CI overhead</td>
+          </tr>
+          <tr>
+            <td><strong>GitHub Actions CI/CD</strong></td>
+            <td>Push to main → build runs in cloud</td>
+            <td>Auto on merge</td>
+            <td>~$12/mo (same DO)</td>
+            <td>Teams, audit trails, rollbacks</td>
+          </tr>
+          <tr>
+            <td><strong>Railway.app</strong></td>
+            <td>Connect GitHub repo → auto-deploys</td>
+            <td>Git push</td>
+            <td>~$5-15/mo</td>
+            <td>Fastest start, zero server management</td>
+          </tr>
+          <tr>
+            <td><strong>Render.com</strong></td>
+            <td>Connect GitHub → Docker build</td>
+            <td>Git push</td>
+            <td>Free → $7/mo per svc</td>
+            <td>Simple APIs, sleeps on free tier</td>
+          </tr>
+          <tr>
+            <td><strong>Fly.io</strong></td>
+            <td><code>fly deploy</code> from local/Droplet</td>
+            <td>CLI push</td>
+            <td>~$3-6/mo per app</td>
+            <td>Global edge, more control than Railway</td>
+          </tr>
+          <tr>
+            <td><strong>Local dev only</strong></td>
+            <td><code>npm run dev</code> on laptop</td>
+            <td>Manual tunnel / ngrok</td>
+            <td>$0</td>
+            <td>Prototyping before spinning up infra</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">💻 Local dev before the Droplet</div>
+        <p>Run both apps locally for rapid iteration — no Docker needed at this stage.</p>
+        <div class="prompt-box"># Terminal 1 — Anelia
+cd apps/anelia && cp .env.example .env
+npm install && npm run dev
+
+# Terminal 2 — School
+cd apps/school && cp .env.example .env
+npm install && npm run dev
+
+# Test
+curl http://localhost:3001/health
+curl http://localhost:3002/health</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔧 pm2 as a Docker alternative</div>
+        <p>If Docker feels heavy on a 2 GB box, pm2 manages both Node processes directly with auto-restart on crash.</p>
+        <div class="prompt-box">npm install -g pm2
+
+pm2 start apps/anelia/index.js --name anelia
+pm2 start apps/school/index.js  --name school
+pm2 save && pm2 startup   # survive reboots
+
+pm2 logs anelia           # tail logs
+pm2 restart school        # rolling restart</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── COST SNAPSHOT ──────────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="icon">💰</span> Cost snapshot</div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table>
+        <thead>
+          <tr><th>Service</th><th>Tier</th><th>Cost</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>DigitalOcean Droplet</td><td>Basic 2 GB / 1 vCPU</td><td>~$12/mo</td><td>Resize to 4 GB for $18 if needed</td></tr>
+          <tr><td>Cloudflare Tunnel</td><td>Free</td><td>$0</td><td>Unlimited tunnels on free plan</td></tr>
+          <tr><td>Cloudflare R2</td><td>Free (10 GB)</td><td>$0</td><td>$0.015/GB after 10 GB</td></tr>
+          <tr><td>Netlify</td><td>Starter</td><td>$0</td><td>100 GB bandwidth/mo free</td></tr>
+          <tr><td>Airtable</td><td>Free (until 2028)</td><td>$0</td><td>1,000 records/base — watch the school app</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cost-total">
+      <div class="label">Monthly total (both apps running)</div>
+      <div class="amount">~$12 / mo</div>
+    </div>
+  </div>
+
+  <!-- ── QUICK CLAUDE CODE PROMPTS ──────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🤖</span> Quick Claude Code prompts — copy &amp; paste</div>
+    <div class="grid-2">
+
+      <div class="card">
+        <div class="card-title">Bootstrap &amp; health-check</div>
+        <div class="prompt-box">Verify docker compose is running, cloudflared is active,
+and both /health endpoints return 200.
+Fix anything that is broken.
+Repo is at /root/hq.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Add an Airtable route (Anelia)</div>
+        <div class="prompt-box">In /root/hq/apps/anelia/index.js add POST /api/items:
+- Accept JSON { name, description }
+- Write a new record to Airtable base $AIRTABLE_BASE_ID
+- Return the created record with status 201
+Use fetch (Node 18+), read creds from process.env.
+Rebuild the container after.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Deploy after a code change</div>
+        <div class="prompt-box">I just changed /root/hq/apps/school/index.js.
+Rebuild: docker compose up -d --build school
+Confirm GET /health returns 200.
+Then run: ./scripts/deploy.sh school</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Check Airtable headroom</div>
+        <div class="prompt-box">Count total records in the school Airtable base
+(base ID: $AIRTABLE_BASE_ID, key: $AIRTABLE_API_KEY).
+Warn if count exceeds 800. Free tier cap is 1,000.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <p>AMARSHIHQ &mdash; Vijay's Dev HQ &mdash; MIT &copy; ACoolNERD &mdash; Built with Claude Code</p>
+  </footer>
+
+</div>
+</body>
+</html>

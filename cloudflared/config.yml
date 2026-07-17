@@ -1,0 +1,29 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Cloudflare Tunnel — config for Vijay's Droplet
+#
+# Setup (one-time, run on Droplet as root):
+#   cloudflared tunnel login
+#   cloudflared tunnel create vijay-droplet
+#   # Copy the generated tunnel ID into TUNNEL_ID below, then:
+#   cloudflared tunnel route dns vijay-droplet api-anelia.yourdomain.com
+#   cloudflared tunnel route dns vijay-droplet api-school.yourdomain.com
+#
+# Run the tunnel as a daemon:
+#   cloudflared service install
+#   systemctl start cloudflared
+# ─────────────────────────────────────────────────────────────────────────────
+
+tunnel: <YOUR_TUNNEL_ID>          # replace after `cloudflared tunnel create`
+credentials-file: /root/.cloudflared/<YOUR_TUNNEL_ID>.json
+
+ingress:
+  # Anelia API — tunnelled to the container's loopback port
+  - hostname: api-anelia.yourdomain.com
+    service: http://localhost:3001
+
+  # School API
+  - hostname: api-school.yourdomain.com
+    service: http://localhost:3002
+
+  # Catch-all — required by cloudflared; returns 404 for unknown hostnames
+  - service: http_status:404
