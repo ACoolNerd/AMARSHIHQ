@@ -19,7 +19,8 @@ app.get('/api/records', async (_req, res) => {
     // TODO: call Airtable REST API using process.env.AIRTABLE_API_KEY + AIRTABLE_BASE_ID
     res.json({ records: [], message: 'Airtable integration — configure .env' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[anelia] /api/records error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -30,7 +31,8 @@ app.get('/api/files', async (_req, res) => {
     // endpoint: https://<ACCOUNT_ID>.r2.cloudflarestorage.com
     res.json({ files: [], message: 'R2 integration — configure .env' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[anelia] /api/files error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

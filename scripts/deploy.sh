@@ -18,7 +18,10 @@ APP="${1:-}"
 
 deploy_app() {
   local app="$1"
-  local app_dir="/apps/${app}"
+  # Resolve the app dir relative to this script's repo root
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local app_dir="${script_dir}/../apps/${app}"
   local site_id_var="NETLIFY_SITE_ID_$(echo "$app" | tr '[:lower:]' '[:upper:]')"
   local site_id="${!site_id_var:-}"
 
